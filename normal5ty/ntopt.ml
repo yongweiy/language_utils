@@ -1,7 +1,9 @@
 open Sexplib.Std
+open Ppx_compare_lib.Builtin
+open Ppx_hash_lib.Std.Hash.Builtin
 open Sugar
 
-type t = Nt.t option [@@deriving sexp]
+type t = Nt.t option [@@deriving sexp, compare, equal, hash]
 
 let is_basic_tp = function
   | Some t -> Nt.is_basic_tp t

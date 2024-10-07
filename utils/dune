@@ -9,6 +9,7 @@
    zlog
    rename
    pp
+   limit
  )
  (libraries zzdatatype core core_unix yojson dolog ocolor ppx_here)
 )

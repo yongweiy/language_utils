@@ -1,7 +1,9 @@
 open Sexplib.Std
+open Ppx_compare_lib.Builtin
+open Ppx_hash_lib.Std.Hash.Builtin
 (* open Sugar *)
 
-type t = string option * Nt.t [@@deriving sexp]
+type t = string option * Nt.t [@@deriving sexp, compare, equal, hash]
 
 let eq (a1, b1) (a2, b2) =
   match (a1, a2) with

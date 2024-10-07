@@ -1,9 +1,10 @@
 module Array = Zarray.Array
 
 module List = struct
-  include List
+  include Containers.List
 
   let spf = Printf.sprintf
+  let get_opt = function [ x ] -> Some x | _ -> None
   let nth_opt l x = try nth_opt l x with _ -> None
   let destruct_opt = function [] -> None | h :: t -> Some (h, t)
 
@@ -163,6 +164,14 @@ module List = struct
     let rec aux r i = function [] -> r | h :: t -> aux (f r i h) (i + 1) t in
     aux default 0 l
 
+  let fold_righti f l default =
+    let rec aux = function
+      | [] -> (0, default)
+      | h :: t ->
+          let i, r = aux t in
+          (i + 1, f i h r)
+    in snd @@ aux l
+
   let mean_exn (f : 'a -> float) (l : 'a list) =
     if length l == 0 then raise @@ failwith @@ spf "[%s]:never happen" __FILE__
     else
@@ -261,6 +270,43 @@ module List = struct
     in
     aux [] l1
 
+  let intersect_map f l1 l2 =
+    let rec aux r = function
+      | [] -> r
+      | h :: t ->
+         match find_map (f h) l2 with
+         | Some h' -> aux (h' :: r) t
+         | None -> aux r t
+    in
+    aux [] l1
+
+  let intersect_and_subtract compare l1 l2 =
+    let rec aux inter diff = function
+      | [] -> inter, diff
+      | h :: t ->
+        if exists (fun y -> compare h y) l2 then
+          aux (h :: inter) diff t
+        else aux inter (h :: diff) t
+    in
+    aux [] [] l1
+
+  let intersect_and_subtract2 compare l1 l2 =
+    let rec aux inter diff = function
+        | [] -> inter, diff
+        | h :: t ->
+          match find_opt (fun y -> compare h y) l2 with
+          | Some h' -> aux (h' :: inter) diff t
+          | None -> aux inter (h :: diff) t
+    in
+    aux [] [] l1
+
+  let union compare l1 l2 =
+    let rec aux r = function
+        | [] -> r
+        | h :: t ->
+            if exists (fun y -> compare h y) l1 then aux r t else aux (h :: r) t
+    in
+    aux l1 l2
   (* let union compare l1 l2 = *)
   (*   let rec aux r = function *)
   (*     | [] -> r *)
@@ -268,6 +314,21 @@ module List = struct
   (*         if exists (fun y -> compare h y) l2 then aux r t else aux (h :: r) t *)
   (*   in *)
   (*   aux [] (l1 @ l2) *)
+
+  let union_map f l1 l2 =
+    let l1, l2 =
+      fold_left (fun (l1, l2) x ->
+          let xs, l2 =
+            partition_filter_map (fun y ->
+                match f x y with
+                | Some x -> `Left x
+                | None -> `Right y) l2
+          in
+          match xs with
+          | [] -> x :: l1, l2
+          | x :: _ -> x :: l1, l2)
+        ([], l2) l1
+    in l1 @ l2
 
   (* let remove_duplicates_eq l = remove_duplicates (fun x y -> x == y) l *)
 
@@ -338,6 +399,12 @@ module List = struct
         else aux i (j + 1) ((List.nth l0 i, List.nth l1 j) :: res)
       in
       aux 0 0 []
+
+  let cartesian l1 l2 =
+    List.concat_map (fun x1 -> List.map (fun x2 -> (x1, x2)) l2) l1
+
+  let cartesian_map f l1 l2 =
+    List.concat_map (fun x1 -> List.map (fun x2 -> f x1 x2) l2) l1
 
   let match_snoc l =
     let l = List.rev l in
@@ -523,12 +590,136 @@ module List = struct
       if incr 0 then aux r else r
     in
     aux default
+
+  (** like `sort_uniq` but combine duplicated elements with `cmb` *)
+  let sort_and_combine cmp cmb l =
+  let rec rev_merge l1 l2 accu =
+    match l1, l2 with
+    | [], l2 -> rev_append l2 accu
+    | l1, [] -> rev_append l1 accu
+    | h1::t1, h2::t2 ->
+        let c = cmp h1 h2 in
+        if c = 0 then rev_merge t1 t2 ((cmb h1 h2)::accu)
+        else if c < 0
+        then rev_merge t1 l2 (h1::accu)
+        else rev_merge l1 t2 (h2::accu)
+  in
+  let rec rev_merge_rev l1 l2 accu =
+    match l1, l2 with
+    | [], l2 -> rev_append l2 accu
+    | l1, [] -> rev_append l1 accu
+    | h1::t1, h2::t2 ->
+        let c = cmp h1 h2 in
+        if c = 0 then rev_merge_rev t1 t2 ((cmb h1 h2)::accu)
+        else if c > 0
+        then rev_merge_rev t1 l2 (h1::accu)
+        else rev_merge_rev l1 t2 (h2::accu)
+  in
+  let rec sort n l =
+    match n, l with
+    | 2, x1 :: x2 :: tl ->
+        let s =
+          let c = cmp x1 x2 in
+          if c = 0 then [cmb x1 x2]
+          else if c < 0 then [x1; x2]
+          else [x2; x1]
+        in
+        (s, tl)
+    | 3, x1 :: x2 :: x3 :: tl ->
+        let s =
+          let c = cmp x1 x2 in
+          if c = 0 then
+            let x2 = cmb x1 x2 in
+            let c = cmp x2 x3 in
+            if c = 0 then [cmb x2 x3]
+            else if c < 0 then [x2; x3]
+            else [x3; x2]
+          else if c < 0 then
+            let c = cmp x2 x3 in
+            if c = 0 then [x1; cmb x2 x3]
+            else if c < 0 then [x1; x2; x3]
+            else
+              let c = cmp x1 x3 in
+              if c = 0 then [cmb x1 x3; x2]
+              else if c < 0 then [x1; x3; x2]
+              else [x3; x1; x2]
+          else
+            let c = cmp x1 x3 in
+            if c = 0 then [x2; cmb x1 x3]
+            else if c < 0 then [x2; x1; x3]
+            else
+              let c = cmp x2 x3 in
+              if c = 0 then [cmb x2 x3; x1]
+              else if c < 0 then [x2; x3; x1]
+              else [x3; x2; x1]
+        in
+        (s, tl)
+    | n, l ->
+        let n1 = n asr 1 in
+        let n2 = n - n1 in
+        let s1, l2 = rev_sort n1 l in
+        let s2, tl = rev_sort n2 l2 in
+        (rev_merge_rev s1 s2 [], tl)
+  and rev_sort n l =
+    match n, l with
+    | 2, x1 :: x2 :: tl ->
+        let s =
+          let c = cmp x1 x2 in
+          if c = 0 then [cmb x1 x2]
+          else if c > 0 then [x1; x2] else [x2; x1]
+        in
+        (s, tl)
+    | 3, x1 :: x2 :: x3 :: tl ->
+        let s =
+          let c = cmp x1 x2 in
+          if c = 0 then
+            let x2 = cmb x1 x2 in
+            let c = cmp x2 x3 in
+            if c = 0 then [cmb x2 x3]
+            else if c > 0 then [x2; x3]
+            else [x3; x2]
+          else if c > 0 then
+            let c = cmp x2 x3 in
+            if c = 0 then [x1; cmb x2 x3]
+            else if c > 0 then [x1; x2; x3]
+            else
+              let c = cmp x1 x3 in
+              if c = 0 then [cmb x1 x3; x2]
+              else if c > 0 then [x1; x3; x2]
+              else [x3; x1; x2]
+          else
+            let c = cmp x1 x3 in
+            if c = 0 then [x2; cmb x1 x3]
+            else if c > 0 then [x2; x1; x3]
+            else
+              let c = cmp x2 x3 in
+              if c = 0 then [cmb x2 x3; x1]
+              else if c > 0 then [x2; x3; x1]
+              else [x3; x2; x1]
+        in
+        (s, tl)
+    | n, l ->
+        let n1 = n asr 1 in
+        let n2 = n - n1 in
+        let s1, l2 = sort n1 l in
+        let s2, tl = sort n2 l2 in
+        (rev_merge s1 s2 [], tl)
+  in
+  let len = length l in
+  if len < 2 then l else fst (sort len l)
 end
 
 module StrList = struct
   let eq l1 l2 = List.eq String.equal l1 l2
   let to_string l = List.to_string (fun x -> x) l
+  let exists x = List.exists (fun a -> String.equal a x)
   let search errinfo l a = List.find errinfo (fun (k, _) -> String.equal k a) l
+  let subset l1 l2 = List.for_all (fun x -> List.exists (String.equal x) l2) l1
+  let intersect l1 l2 = List.interset String.equal l1 l2
+  let intersect_and_subtract l1 l2 = List.intersect_and_subtract String.equal l1 l2
+  let subtract l1 l2 = List.substract String.equal l1 l2
+  let is_disjoint l1 l2 = List.for_all (fun x -> not (List.exists (String.equal x) l2)) l1
+  let union l1 l2 = List.union String.equal l1 l2
 end
 
 module IntList = struct
@@ -581,10 +772,10 @@ module IntList = struct
     List.init len (fun i -> i + s)
 
   let is_strict_sort (l : int list) =
-    let l' = List.sort_uniq compare l in
+    let l' = List.sort_uniq ~cmp:compare l in
     List.eq ( == ) l l'
 
   let is_unique (l : int list) =
-    let l' = List.sort_uniq compare l in
+    let l' = List.sort_uniq ~cmp:compare l in
     List.length l == List.length l'
 end

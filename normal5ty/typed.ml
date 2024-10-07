@@ -10,7 +10,7 @@ end
 module type T = sig
   include T.T
 
-  type 'a typed = { x : 'a; ty : t } [@@deriving sexp]
+  type 'a typed = { x : 'a; ty : t } [@@deriving sexp, compare, equal, hash]
 
   val mk_noty : 'a -> 'a typed
   val ( #: ) : 'a -> t -> 'a typed
@@ -24,7 +24,7 @@ end
 module F (Ty : T.T) : T with type t = Ty.t = struct
   include Ty
 
-  type 'a typed = { x : 'a; ty : Ty.t } [@@deriving sexp]
+  type 'a typed = { x : 'a; ty : Ty.t } [@@deriving sexp, compare, equal, hash]
 
   let ( #: ) x ty = { x; ty }
   let ( #-> ) f { x; ty } = { x = f x; ty }

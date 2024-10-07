@@ -1,7 +1,7 @@
 (library
  (name zzdatatype)
  (public_name language_utils.zzdatatype)
- (libraries core)
+ (libraries core containers)
  (modules
    zarray
    zlabeled_tree

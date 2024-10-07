@@ -8,6 +8,10 @@ let rec fastexpt : int -> int -> int =
     let b2 = fastexpt b (n / 2) in
     if n mod 2 = 0 then b2 * b2 else b * b2 * b2
 
+let mk_pair a b = (a, b)
+let swap (a, b) = (b, a)
+let mk_triple a b c = (a, b, c)
+
 let map2 f (a, b) = (f a, f b)
 let map3 f (a, b, c) = (f a, f b, f c)
 let map4 f (a, b, c, d) = (f a, f b, f c, f d)
@@ -32,6 +36,8 @@ let opt_fmap (x : 'a option) (f : 'a -> 'b) : 'b option =
 let opt_bind (x : 'a option) (f : 'a -> 'b option) : 'b option =
   match x with None -> None | Some x -> f x
 
+let opt_guard = function true -> Some () | false -> None
+
 let bopt_false = function Some b -> b | None -> false
 
 let opt_list_to_list_opt l =
@@ -51,8 +57,12 @@ let compare_bind a b = if a != 0 then a else b
 let ( &&& ) a b x = a x && b x
 
 let ( ||| ) a b x = a x || b x
-let ( #. ) f g x = f (g x)
-let ( #> ) f g x = g (f x)
+(* let ( #. ) f g x = f (g x) *)
+(* let ( #> ) f g x = g (f x) *)
+let ( << ) f g x = f (g x)
+let ( >> ) f g x = g (f x)
+let curry f x y = f (x, y)
+let rec applyn ~n f x = if n = 0 then x else applyn ~n:(n - 1) f (f x)
 
 let clock f =
   let start_t = Core_unix.gettimeofday () in

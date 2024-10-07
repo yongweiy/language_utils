@@ -1,5 +1,5 @@
 module type T = sig
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, compare, equal, hash]
 
   val is_basic_tp : t -> bool
   val is_dt : t -> bool
