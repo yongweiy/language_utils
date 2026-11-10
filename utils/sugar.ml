@@ -62,6 +62,12 @@ let ( ||| ) a b x = a x || b x
 let ( << ) f g x = f (g x)
 let ( >> ) f g x = g (f x)
 let curry f x y = f (x, y)
+
+(** [x |> tap f] runs [f x] for its side effect and returns [x]. *)
+let tap f x =
+  f x;
+  x
+
 let rec applyn ~n f x = if n = 0 then x else applyn ~n:(n - 1) f (f x)
 
 let clock f =
